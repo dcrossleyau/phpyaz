@@ -54,11 +54,6 @@
 
 #define MAX_ASSOC 200
 
-#define GET_PARM1(a) zend_parse_parameters(1 TSRMLS_CC , "z", a)
-#define GET_PARM2(a,b) zend_parse_parameters(2 TSRMLS_CC, "zz", a, b)
-#define GET_PARM3(a,b,c) zend_parse_parameters(3 TSRMLS_CC, "zzz", a, b, c)
-#define GET_PARM4(a,b,c,d) zend_parse_parameters(4 TSRMLS_CC, "zzzz", a, b, c, d)
-
 typedef struct Yaz_AssociationInfo *Yaz_Association;
 
 struct Yaz_AssociationInfo {
@@ -1811,15 +1806,10 @@ PHP_FUNCTION(yaz_ccl_conf)
 	Yaz_Association p;
 
 	if (ZEND_NUM_ARGS() != 2 ||
-		GET_PARM2(&pval_id, &pval_package) == FAILURE) {
+		zend_parse_parameters(2 TSRMLS_CC, "za", &pval_id, &pval_package)
+		== FAILURE) {
 		WRONG_PARAM_COUNT;
 	}
-
-	if (Z_TYPE_PP(&pval_package) != IS_ARRAY) {
-		php_error_docref(NULL TSRMLS_CC, E_WARNING, "Expected array parameter");
-		RETURN_FALSE;
-	}
-
 	get_assoc(INTERNAL_FUNCTION_PARAM_PASSTHRU, pval_id, &p);
 	if (p) {
 		HashTable *ht = Z_ARRVAL_PP(&pval_package);
@@ -1854,27 +1844,28 @@ PHP_FUNCTION(yaz_ccl_conf)
    Parse a CCL query */
 PHP_FUNCTION(yaz_ccl_parse)
 {
-	zval *pval_id, *pval_query, *pval_res = 0;
+	zval *pval_id, *pval_res = 0;
+	char *query;
+	int query_len;
 	Yaz_Association p;
 
-	if (ZEND_NUM_ARGS() != 3 || GET_PARM3( &pval_id, &pval_query, &pval_res)
+	if (ZEND_NUM_ARGS() != 3 ||
+		zend_parse_parameters(3 TSRMLS_CC, "zsz",
+							  &pval_id, &query, &query_len, &pval_res)
 		== FAILURE) {
 		WRONG_PARAM_COUNT;
 	}
 
 	zval_dtor(pval_res);
 	array_init(pval_res);
-	convert_to_string_ex(&pval_query);
-
 	get_assoc(INTERNAL_FUNCTION_PARAM_PASSTHRU, pval_id, &p);
 	if (p) {
-		const char *query_str = pval_query->value.str.val;
 		struct ccl_rpn_node *rpn;
 		int error_pos;
 		int error_code;
 		CCL_parser ccl_parser = ccl_parser_create(p->bibset);
 
-		rpn = ccl_parser_find_str(ccl_parser, query_str);
+		rpn = ccl_parser_find_str(ccl_parser, query);
 
 		error_code = ccl_parser_get_error(ccl_parser, &error_pos);
 		add_assoc_long(pval_res, "errorcode", error_code);
@@ -1937,17 +1928,19 @@ PHP_FUNCTION(yaz_ccl_parse)
    Specify the databases within a session */
 PHP_FUNCTION(yaz_database)
 {
-	zval *pval_id, *pval_database;
+	zval *pval_id;
+	char *database;
+	int database_len;
 	Yaz_Association p;
 
 	if (ZEND_NUM_ARGS() != 2 ||
-		GET_PARM2(&pval_id, &pval_database) == FAILURE) {
+		zend_parse_parameters(2 TSRMLS_CC, "zs", &pval_id,
+							  &database, &database_len) == FAILURE) {
 		WRONG_PARAM_COUNT;
 	}
 
-	convert_to_string_ex(&pval_database);
 	get_assoc(INTERNAL_FUNCTION_PARAM_PASSTHRU, pval_id, &p);
-	option_set(p, "databaseName", pval_database->value.str.val);
+	option_set(p, "databaseName", database);
 	RETVAL_TRUE;
 	release_assoc(p);
 }
